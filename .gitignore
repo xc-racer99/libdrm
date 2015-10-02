@@ -89,6 +89,7 @@ tests/etnaviv/etnaviv_cmd_stream_test
 tests/exynos/exynos_fimg2d_event
 tests/exynos/exynos_fimg2d_perf
 tests/exynos/exynos_fimg2d_test
+tests/exynos/exynos_ipp_test
 tests/getclient
 tests/getstats
 tests/getversion
