@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include <xf86drm.h>
+#include "libdrm_macros.h"
 #include "exynos_drm.h"
 #include "exynos_drmif.h"
 
@@ -400,7 +401,7 @@ setup_format(int fd, uint32_t ipp_id, struct ipp_format *fmt,
  *
  * @fd: a file descriptor to an opened DRM device.
  */
-struct ipp_context *ipp_init(int fd)
+drm_public struct ipp_context *ipp_init(int fd)
 {
 	int ret;
 	unsigned i;
@@ -486,7 +487,7 @@ struct ipp_context *ipp_init(int fd)
  *
  * Passing a null pointer as context results in a NOP.
  */
-void ipp_fini(struct ipp_context *ctx)
+drm_public void ipp_fini(struct ipp_context *ctx)
 {
 	if (ctx) {
 		unsigned i, j;
@@ -511,7 +512,7 @@ void ipp_fini(struct ipp_context *ctx)
  *
  * @ctx: a pointer to a IPP context structure.
  */
-unsigned ipp_num_modules(struct ipp_context *ctx)
+drm_public unsigned ipp_num_modules(struct ipp_context *ctx)
 {
 	if (!ctx)
 		return 0;
@@ -525,7 +526,7 @@ unsigned ipp_num_modules(struct ipp_context *ctx)
  * @ctx: a pointer to a valid IPP context structure.
  * @index: index of the IPP module.
  */
-const struct ipp_module*
+drm_public const struct ipp_module*
 ipp_get_module(struct ipp_context *ctx, unsigned index)
 {
 	if (index >= ctx->num_modules)
@@ -539,7 +540,7 @@ ipp_get_module(struct ipp_context *ctx, unsigned index)
  *
  * @module_idx: index of the IPP index this task should run on.
  */
-struct ipp_task *ipp_task_create(unsigned module_idx)
+drm_public struct ipp_task *ipp_task_create(unsigned module_idx)
 {
 	struct ipp_task *task;
 
@@ -559,7 +560,7 @@ struct ipp_task *ipp_task_create(unsigned module_idx)
  *
  * Passing a null pointer as context results in a NOP.
  */
-void ipp_task_destroy(struct ipp_task *task)
+drm_public void ipp_task_destroy(struct ipp_task *task)
 {
 	unsigned i;
 
@@ -586,7 +587,7 @@ void ipp_task_destroy(struct ipp_task *task)
  *
  * Both buf and rect are allowed to be null.
  */
-int ipp_task_config_src(struct ipp_task *task, struct ipp_buffer *buf, struct ipp_rect *rect)
+drm_public int ipp_task_config_src(struct ipp_task *task, struct ipp_buffer *buf, struct ipp_rect *rect)
 {
 	int ret;
 
@@ -619,7 +620,7 @@ int ipp_task_config_src(struct ipp_task *task, struct ipp_buffer *buf, struct ip
  *
  * Both buf and rect are allowed to be null.
  */
-int ipp_task_config_dst(struct ipp_task *task, struct ipp_buffer *buf, struct ipp_rect *rect)
+drm_public int ipp_task_config_dst(struct ipp_task *task, struct ipp_buffer *buf, struct ipp_rect *rect)
 {
 	int ret;
 
@@ -649,7 +650,7 @@ int ipp_task_config_dst(struct ipp_task *task, struct ipp_buffer *buf, struct ip
  * @task: a pointer to a IPP task structure.
  * @rotation: the transform's rotation value.
  */
-int ipp_task_config_transf(struct ipp_task *task, uint32_t rotation)
+drm_public int ipp_task_config_transf(struct ipp_task *task, uint32_t rotation)
 {
 	if (!task)
 		return -EINVAL;
@@ -674,7 +675,7 @@ int ipp_task_config_transf(struct ipp_task *task, uint32_t rotation)
  * @task: a pointer to a IPP task structure.
  * @alpha: the alpha value to apply.
  */
-int ipp_task_config_alpha(struct ipp_task *task, uint32_t alpha)
+drm_public int ipp_task_config_alpha(struct ipp_task *task, uint32_t alpha)
 {
 	if (!task)
 		return -EINVAL;
@@ -699,7 +700,7 @@ int ipp_task_config_alpha(struct ipp_task *task, uint32_t alpha)
  * @ctx: a pointer to a IPP context structure.
  * @task: a pointer to a IPP task structure.
  */
-int ipp_check(struct ipp_context *ctx, struct ipp_task *task)
+drm_public int ipp_check(struct ipp_context *ctx, struct ipp_task *task)
 {
 	struct drm_exynos_ioctl_ipp_commit req = { 0 };
 	unsigned task_size;
@@ -748,7 +749,7 @@ int ipp_check(struct ipp_context *ctx, struct ipp_task *task)
  * fashion. The completion of the task is signaled through an event on
  * the DRM fd.
  */
-int ipp_commit(struct ipp_context *ctx, struct ipp_task *task, void *event_data)
+drm_public int ipp_commit(struct ipp_context *ctx, struct ipp_task *task, void *event_data)
 {
 	struct drm_exynos_ioctl_ipp_commit req = { 0 };
 	unsigned task_size;
