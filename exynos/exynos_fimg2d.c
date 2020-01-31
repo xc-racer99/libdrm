@@ -112,7 +112,7 @@ union g2d_direction_val {
 	} data;
 };
 
-static unsigned int g2d_get_scaling(unsigned int src, unsigned int dst)
+static unsigned int g2d_get_v4_scaling(unsigned int src, unsigned int dst)
 {
 	/*
 	 * The G2D hw scaling factor is a normalized inverse of the scaling factor.
@@ -207,18 +207,18 @@ static int g2d_validate_select_mode(
 /*
  * g2d_validate_blending_op - validate blending operation.
  *
+ * @ctx: a pointer to g2d_context structure.
  * @operation: the operation to validate
  *
  * Returns zero for an invalid mode and one otherwise.
  */
-static int g2d_validate_blending_op(
+static int g2d_validate_blending_op(struct g2d_context *ctx,
 	enum e_g2d_op operation)
 {
 	switch (operation) {
-	case G2D_OP_CLEAR:
-	case G2D_OP_SRC:
-	case G2D_OP_DST:
 	case G2D_OP_OVER:
+		return 1;
+	case G2D_OP_DST:
 	case G2D_OP_INTERPOLATE:
 	case G2D_OP_DISJOINT_CLEAR:
 	case G2D_OP_DISJOINT_SRC:
@@ -226,7 +226,7 @@ static int g2d_validate_blending_op(
 	case G2D_OP_CONJOINT_CLEAR:
 	case G2D_OP_CONJOINT_SRC:
 	case G2D_OP_CONJOINT_DST:
-		return 1;
+		return ctx->major > 3;
 	}
 
 	return 0;
@@ -246,10 +246,15 @@ static void g2d_add_cmd(struct g2d_context *ctx, unsigned long cmd,
 			unsigned long value)
 {
 	switch (cmd & ~(G2D_BUF_USERPTR)) {
-	case SRC_BASE_ADDR_REG:
 	case SRC_PLANE2_BASE_ADDR_REG:
-	case DST_BASE_ADDR_REG:
 	case DST_PLANE2_BASE_ADDR_REG:
+		if (ctx->major == 3) {
+			fprintf(stderr, MSG_PREFIX "invalid register\n");
+			return;
+		}
+		/* fall through */
+	case SRC_BASE_ADDR_REG:
+	case DST_BASE_ADDR_REG:
 	case PAT_BASE_ADDR_REG:
 	case MASK_BASE_ADDR_REG:
 		assert(ctx->cmd_buf_nr < G2D_MAX_GEM_CMD_NR);
@@ -448,6 +453,7 @@ g2d_solid_fill(struct g2d_context *ctx, struct g2d_image *img,
 			unsigned int h)
 {
 	union g2d_bitblt_cmd_val bitblt;
+	union g2d_rop4_val rop4;
 	union g2d_point_val pt;
 
 	if (g2d_check_space(ctx, 7, 1))
@@ -471,11 +477,27 @@ g2d_solid_fill(struct g2d_context *ctx, struct g2d_image *img,
 	pt.data.y = y + h;
 	g2d_add_cmd(ctx, DST_RIGHT_BOTTOM_REG, pt.val);
 
-	g2d_add_cmd(ctx, SF_COLOR_REG, img->color);
+	if (ctx->major == 3) {
+		/*
+		 * v3 hardware has no solid fill, so do a ROP4
+		 * using FG color as source
+		 */
+		g2d_add_cmd(ctx, SRC_COLOR_MODE_REG, img->color_mode);
 
-	bitblt.val = 0;
-	bitblt.data.fast_solid_color_fill_en = 1;
-	g2d_add_cmd(ctx, BITBLT_COMMAND_REG, bitblt.val);
+		g2d_add_cmd(ctx, FG_COLOR_REG, img->color);
+
+		g2d_add_cmd(ctx, SRC_SELECT_REG, G2D_SELECT_MODE_FGCOLOR);
+
+		rop4.val = 0;
+		rop4.data.unmasked_rop3 = G2D_ROP3_SRC;
+		g2d_add_cmd(ctx, ROP4_REG, rop4.val);
+	} else {
+		g2d_add_cmd(ctx, SF_COLOR_REG, img->color);
+
+		bitblt.val = 0;
+		bitblt.data.fast_solid_color_fill_en = 1;
+		g2d_add_cmd(ctx, BITBLT_COMMAND_REG, bitblt.val);
+	}
 
 	return g2d_flush(ctx);
 }
@@ -697,8 +719,10 @@ g2d_copy_with_scale(struct g2d_context *ctx, struct g2d_image *src,
 		scale = 0;
 	else {
 		scale = 1;
-		scale_x = g2d_get_scaling(src_w, dst_w);
-		scale_y = g2d_get_scaling(src_h, dst_h);
+		if (ctx->major > 4) {
+			scale_x = g2d_get_v4_scaling(src_w, dst_w);
+			scale_y = g2d_get_v4_scaling(src_h, dst_h);
+		}
 	}
 
 	repeat_pad = src->repeat_mode == G2D_REPEAT_MODE_PAD ? 1 : 0;
@@ -747,9 +771,13 @@ g2d_copy_with_scale(struct g2d_context *ctx, struct g2d_image *src,
 	g2d_add_cmd(ctx, ROP4_REG, rop4.val);
 
 	if (scale) {
-		g2d_add_cmd(ctx, SRC_SCALE_CTRL_REG, G2D_SCALE_MODE_BILINEAR);
-		g2d_add_cmd(ctx, SRC_XSCALE_REG, scale_x);
-		g2d_add_cmd(ctx, SRC_YSCALE_REG, scale_y);
+		if (ctx->major == 3) {
+			g2d_add_cmd(ctx, BITBLT_COMMAND_REG, G2D_CMD_V3_ENABLE_STRETCH);
+		} else {
+			g2d_add_cmd(ctx, SRC_SCALE_CTRL_REG, G2D_SCALE_MODE_BILINEAR);
+			g2d_add_cmd(ctx, SRC_XSCALE_REG, scale_x);
+			g2d_add_cmd(ctx, SRC_YSCALE_REG, scale_y);
+		}
 	}
 
 	pt.data.x = src_x;
@@ -824,7 +852,7 @@ g2d_blend(struct g2d_context *ctx, struct g2d_image *src,
 		return -EINVAL;
 	}
 
-	if (!g2d_validate_blending_op(op)) {
+	if (!g2d_validate_blending_op(ctx, op)) {
 		fprintf(stderr , MSG_PREFIX "unsupported blending operation.\n");
 		return -EINVAL;
 	}
@@ -863,9 +891,11 @@ g2d_blend(struct g2d_context *ctx, struct g2d_image *src,
 	}
 
 	bitblt.data.alpha_blend_mode = G2D_ALPHA_BLEND_MODE_ENABLE;
-	blend.val = g2d_get_blend_op(op);
 	g2d_add_cmd(ctx, BITBLT_COMMAND_REG, bitblt.val);
-	g2d_add_cmd(ctx, BLEND_FUNCTION_REG, blend.val);
+	if (ctx->major > 3) {
+		blend.val = g2d_get_blend_op(op);
+		g2d_add_cmd(ctx, BLEND_FUNCTION_REG, blend.val);
+	}
 
 	pt.data.x = src_x;
 	pt.data.y = src_y;
@@ -919,8 +949,10 @@ g2d_scale_and_blend(struct g2d_context *ctx, struct g2d_image *src,
 		scale = 0;
 	else {
 		scale = 1;
-		scale_x = g2d_get_scaling(src_w, dst_w);
-		scale_y = g2d_get_scaling(src_h, dst_h);
+		if (ctx->major > 4) {
+			scale_x = g2d_get_v4_scaling(src_w, dst_w);
+			scale_y = g2d_get_v4_scaling(src_h, dst_h);
+		}
 	}
 
 	if (src_x + src_w > src->width)
@@ -943,7 +975,7 @@ g2d_scale_and_blend(struct g2d_context *ctx, struct g2d_image *src,
 		return -EINVAL;
 	}
 
-	if (!g2d_validate_blending_op(op)) {
+	if (!g2d_validate_blending_op(ctx, op)) {
 		fprintf(stderr , MSG_PREFIX "unsupported blending operation.\n");
 		return -EINVAL;
 	}
@@ -981,16 +1013,23 @@ g2d_scale_and_blend(struct g2d_context *ctx, struct g2d_image *src,
 		break;
 	}
 
-	if (scale) {
+	if (scale && ctx->major > 3) {
 		g2d_add_cmd(ctx, SRC_SCALE_CTRL_REG, G2D_SCALE_MODE_BILINEAR);
 		g2d_add_cmd(ctx, SRC_XSCALE_REG, scale_x);
 		g2d_add_cmd(ctx, SRC_YSCALE_REG, scale_y);
 	}
 
-	bitblt.data.alpha_blend_mode = G2D_ALPHA_BLEND_MODE_ENABLE;
-	blend.val = g2d_get_blend_op(op);
-	g2d_add_cmd(ctx, BITBLT_COMMAND_REG, bitblt.val);
-	g2d_add_cmd(ctx, BLEND_FUNCTION_REG, blend.val);
+	if (ctx->major == 3) {
+		bitblt.data.alpha_blend_mode = G2D_ALPHA_BLEND_MODE_ENABLE;
+		if (scale)
+			bitblt.val |= G2D_CMD_V3_ENABLE_STRETCH;
+		g2d_add_cmd(ctx, BITBLT_COMMAND_REG, bitblt.val);
+	} else {
+		bitblt.data.alpha_blend_mode = G2D_ALPHA_BLEND_MODE_ENABLE;
+		g2d_add_cmd(ctx, BITBLT_COMMAND_REG, bitblt.val);
+		blend.val = g2d_get_blend_op(op);
+		g2d_add_cmd(ctx, BLEND_FUNCTION_REG, blend.val);
+	}
 
 	pt.data.x = src_x;
 	pt.data.y = src_y;

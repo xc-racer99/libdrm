@@ -28,6 +28,8 @@
 
 #define G2D_PLANE_MAX_NR	2
 
+#define G2D_CMD_V3_ENABLE_STRETCH	(1 << 4)
+
 enum e_g2d_color_mode {
 	/* COLOR FORMAT */
 	G2D_COLOR_FMT_XRGB8888,
