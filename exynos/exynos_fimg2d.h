@@ -38,25 +38,25 @@ enum e_g2d_color_mode {
 	G2D_COLOR_FMT_XRGB4444,
 	G2D_COLOR_FMT_ARGB4444,
 	G2D_COLOR_FMT_PRGB888,
-	G2D_COLOR_FMT_YCbCr444,
-	G2D_COLOR_FMT_YCbCr422,
-	G2D_COLOR_FMT_YCbCr420,
+	G2D_COLOR_FMT_YCbCr444,				/* VER4.1 */
+	G2D_COLOR_FMT_YCbCr422,				/* VER4.1 */
+	G2D_COLOR_FMT_YCbCr420,				/* VER4.1 */
 	/* alpha 8bit */
-	G2D_COLOR_FMT_A8,
+	G2D_COLOR_FMT_A8,				/* VER4.1 */
 	/* Luminance 8bit: gray color */
-	G2D_COLOR_FMT_L8,
+	G2D_COLOR_FMT_L8,				/* VER4.1 */
 	/* alpha 1bit */
-	G2D_COLOR_FMT_A1,
+	G2D_COLOR_FMT_A1,				/* VER4.1 */
 	/* alpha 4bit */
-	G2D_COLOR_FMT_A4,
+	G2D_COLOR_FMT_A4,				/* VER4.1 */
 	G2D_COLOR_FMT_MASK,				/* VER4.1 */
 
 	/* COLOR ORDER */
-	G2D_ORDER_AXRGB		= (0 << 4),		/* VER4.1 */
-	G2D_ORDER_RGBAX		= (1 << 4),		/* VER4.1 */
-	G2D_ORDER_AXBGR		= (2 << 4),		/* VER4.1 */
-	G2D_ORDER_BGRAX		= (3 << 4),		/* VER4.1 */
-	G2D_ORDER_MASK		= (3 << 4),		/* VER4.1 */
+	G2D_ORDER_AXRGB		= (0 << 4),
+	G2D_ORDER_RGBAX		= (1 << 4),
+	G2D_ORDER_AXBGR		= (2 << 4),
+	G2D_ORDER_BGRAX		= (3 << 4),
+	G2D_ORDER_MASK		= (3 << 4),
 
 	/* Number of YCbCr plane */
 	G2D_YCbCr_1PLANE	= (0 << 8),		/* VER4.1 */
