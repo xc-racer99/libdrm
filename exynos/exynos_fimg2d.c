@@ -535,7 +535,7 @@ g2d_copy(struct g2d_context *ctx, struct g2d_image *src,
 		src_h = src->height - src_y;
 
 	dst_w = w;
-	dst_h = w;
+	dst_h = h;
 	if (dst_x + dst->width > w)
 		dst_w = dst->width - dst_x;
 	if (dst_y + dst->height > h)
